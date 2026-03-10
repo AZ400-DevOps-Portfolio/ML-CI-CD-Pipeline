@@ -1,28 +1,29 @@
-# Dockerfile
-# Packages the FastAPI app and trained model into a container.
-# This ensures the app runs identically in dev, staging, and production —
-# a core DevOps principle called "environment parity".
+import pickle
+import os
+from sklearn.datasets import load_iris
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
-# Use official lightweight Python image
-FROM python:3.11-slim
+def train_model():
+    iris = load_iris()
+    X, y = iris.data, iris.target
 
-# Set working directory inside the container
-WORKDIR /app
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
 
-# Copy requirements first (Docker caches this layer — speeds up rebuilds)
-COPY requirements.txt .
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+    accuracy = accuracy_score(y_test, model.predict(X_test))
+    print(f"Model accuracy: {accuracy:.2f}")
 
-# Copy the rest of the project
-COPY . .
+    os.makedirs("model", exist_ok=True)
+    with open("model/iris_model.pkl", "wb") as f:
+        pickle.dump(model, f)
 
-# Train the model at build time so it's baked into the container
-RUN python model/train.py
+    print("Model saved to model/iris_model.pkl")
 
-# Expose the port FastAPI will run on
-EXPOSE 8000
-
-# Start the API server
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+if __name__ == "__main__":
+    train_model()
